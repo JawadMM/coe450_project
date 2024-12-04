@@ -128,7 +128,7 @@ const ei_impulse_t impulse_569762_0 = {
     .project_name = "COE450",
     .impulse_id = 1,
     .impulse_name = "Impulse #1",
-    .deploy_version = 5,
+    .deploy_version = 8,
 
     .nn_input_frame_size = 27648,
     .raw_sample_count = 9216,

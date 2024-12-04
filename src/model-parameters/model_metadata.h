@@ -82,7 +82,7 @@
 #define EI_CLASSIFIER_PROJECT_ID                 569762
 #define EI_CLASSIFIER_PROJECT_OWNER              "Jawad Almuttawa"
 #define EI_CLASSIFIER_PROJECT_NAME               "COE450"
-#define EI_CLASSIFIER_PROJECT_DEPLOY_VERSION     5
+#define EI_CLASSIFIER_PROJECT_DEPLOY_VERSION     8
 #define EI_CLASSIFIER_NN_INPUT_FRAME_SIZE        27648
 #define EI_CLASSIFIER_RAW_SAMPLE_COUNT           9216
 #define EI_CLASSIFIER_RAW_SAMPLES_PER_FRAME      1
@@ -150,7 +150,7 @@
 
 #define EI_STUDIO_VERSION_MAJOR             1
 #define EI_STUDIO_VERSION_MINOR             61
-#define EI_STUDIO_VERSION_PATCH             30
+#define EI_STUDIO_VERSION_PATCH             31
 
 #define EI_CLASSIFIER_HR_ENABLED            0
 

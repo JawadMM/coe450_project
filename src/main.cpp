@@ -1,155 +1,298 @@
-#include <Arduino.h>
-#include "esp_camera.h"
 #include "edge-impulse-sdk/classifier/ei_run_classifier.h"
-#include <TJpg_Decoder.h>
+#include "edge-impulse-sdk/dsp/image/image.hpp"
+#include <Arduino.h>
 
-// Camera pins (adjust based on your ESP32 board)
+#include "esp_camera.h"
+
 #define CAMERA_MODEL_WROVER_KIT
 #include "camera_pins.h"
+// Select camera model - find more camera models in camera_pins.h file here
+// https://github.com/espressif/arduino-esp32/blob/master/libraries/ESP32/examples/Camera/CameraWebServer/camera_pins.h
 
-// Callback function declaration
-static int get_signal_data(size_t offset, size_t length, float *out_ptr);
+/* Constant defines -------------------------------------------------------- */
+#define EI_CAMERA_RAW_FRAME_BUFFER_COLS 320
+#define EI_CAMERA_RAW_FRAME_BUFFER_ROWS 240
+#define EI_CAMERA_FRAME_BYTE_SIZE 3
 
-// Input buffer for the model
-static float input_buf[EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE];
 
-// Buffer to hold the resized image
-uint16_t resized_image[EI_CLASSIFIER_INPUT_WIDTH  * EI_CLASSIFIER_INPUT_HEIGHT];
+#include <Wire.h>
 
-// Callback function for JPEG decoder to read into a temporary buffer
-bool jpeg_to_resized_buffer(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t *bitmap) {
-  static uint16_t decoded_image[600 * 480]; // Buffer for the original 600x480 image
+// ESP32-CAM doesn't have dedicated i2c pins, so we define our own. Let's choose 15 and 14
+#define I2C_SDA 15
+#define I2C_SCL 14
+TwoWire I2Cbus = TwoWire(0);
 
-  // Copy decoded blocks into the temporary image buffer
-  for (int j = 0; j < h; j++) {
-    for (int i = 0; i < w; i++) {
-      if ((x + i) < 600 && (y + j) < 480) {
-        decoded_image[(y + j) * 600 + (x + i)] = bitmap[j * w + i];
-      }
-    }
+
+
+
+
+/* Private variables ------------------------------------------------------- */
+static bool debug_nn = false;  // Set this to true to see e.g. features generated from the raw signal
+static bool is_initialised = false;
+uint8_t *snapshot_buf;  //points to the output of the capture
+
+static int ei_camera_get_data(size_t offset, size_t length, float *out_ptr) {
+  // we already have a RGB888 buffer, so recalculate offset into pixel index
+  size_t pixel_ix = offset * 3;
+  size_t pixels_left = length;
+  size_t out_ptr_ix = 0;
+
+  while (pixels_left != 0) {
+    // Swap BGR to RGB here
+    // due to https://github.com/espressif/esp32-camera/issues/379
+    out_ptr[out_ptr_ix] = (snapshot_buf[pixel_ix + 2] << 16) + (snapshot_buf[pixel_ix + 1] << 8) + snapshot_buf[pixel_ix];
+
+    // go to the next pixel
+    out_ptr_ix++;
+    pixel_ix += 3;
+    pixels_left--;
   }
+  // and done!
+  return 0;
+}
+
+static camera_config_t camera_config = {
+  .pin_pwdn = PWDN_GPIO_NUM,
+  .pin_reset = RESET_GPIO_NUM,
+  .pin_xclk = XCLK_GPIO_NUM,
+  .pin_sscb_sda = SIOD_GPIO_NUM,
+  .pin_sscb_scl = SIOC_GPIO_NUM,
+
+  .pin_d7 = Y9_GPIO_NUM,
+  .pin_d6 = Y8_GPIO_NUM,
+  .pin_d5 = Y7_GPIO_NUM,
+  .pin_d4 = Y6_GPIO_NUM,
+  .pin_d3 = Y5_GPIO_NUM,
+  .pin_d2 = Y4_GPIO_NUM,
+  .pin_d1 = Y3_GPIO_NUM,
+  .pin_d0 = Y2_GPIO_NUM,
+  .pin_vsync = VSYNC_GPIO_NUM,
+  .pin_href = HREF_GPIO_NUM,
+  .pin_pclk = PCLK_GPIO_NUM,
+
+  //XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
+  .xclk_freq_hz = 20000000,
+  .ledc_timer = LEDC_TIMER_0,
+  .ledc_channel = LEDC_CHANNEL_0,
+
+  .pixel_format = PIXFORMAT_JPEG,  //YUV422,GRAYSCALE,RGB565,JPEG
+  .frame_size = FRAMESIZE_QVGA,    //QQVGA-UXGA Do not use sizes above QVGA when not JPEG
+
+  .jpeg_quality = 12,  //0-63 lower number means higher quality
+  .fb_count = 1,       //if more than one, i2s runs in continuous mode. Use only with JPEG
+  .fb_location = CAMERA_FB_IN_PSRAM,
+  .grab_mode = CAMERA_GRAB_WHEN_EMPTY,
+};
+
+/* Function definitions ------------------------------------------------------- */
+bool ei_camera_init(void);
+void ei_camera_deinit(void);
+bool ei_camera_capture(uint32_t img_width, uint32_t img_height, uint8_t *out_buf);
+
+/**
+* @brief      Arduino setup function
+*/
+void setup() {
+  // put your setup code here, to run once:
+  Serial.begin(115200);
+
+  // Initialize I2C with our defined pins
+  I2Cbus.begin(I2C_SDA, I2C_SCL, 100000);
+
+
+
+  //comment out the below line to start inference immediately after upload
+  while (!Serial)
+    ;
+  Serial.println("Edge Impulse Inferencing Demo");
+  if (ei_camera_init() == false) {
+    ei_printf("Failed to initialize Camera!\r\n");
+  } else {
+    ei_printf("Camera initialized\r\n");
+  }
+
+  ei_printf("\nStarting continious inference in 2 seconds...\n");
+}
+
+/**
+* @brief      Get data and run inferencing
+*
+* @param[in]  debug  Get debug info if true
+*/
+void loop() {
+  
+  // instead of wait_ms, we'll wait on the signal, this allows threads to cancel us...
+  if (ei_sleep(5) != EI_IMPULSE_OK) {
+    return;
+  }
+
+  snapshot_buf = (uint8_t *)malloc(EI_CAMERA_RAW_FRAME_BUFFER_COLS * EI_CAMERA_RAW_FRAME_BUFFER_ROWS * EI_CAMERA_FRAME_BYTE_SIZE);
+
+  // check if allocation was successful
+  if (snapshot_buf == nullptr) {
+    ei_printf("ERR: Failed to allocate snapshot buffer!\n");
+    return;
+  }
+
+  ei::signal_t signal;
+  signal.total_length = EI_CLASSIFIER_INPUT_WIDTH * EI_CLASSIFIER_INPUT_HEIGHT;
+  signal.get_data = &ei_camera_get_data;
+
+  if (ei_camera_capture((size_t)EI_CLASSIFIER_INPUT_WIDTH, (size_t)EI_CLASSIFIER_INPUT_HEIGHT, snapshot_buf) == false) {
+    ei_printf("Failed to capture image\r\n");
+    free(snapshot_buf);
+    return;
+  }
+
+  // Run the classifier
+  ei_impulse_result_t result = { 0 };
+
+  EI_IMPULSE_ERROR err = run_classifier(&signal, &result, debug_nn);
+  if (err != EI_IMPULSE_OK) {
+    ei_printf("ERR: Failed to run classifier (%d)\n", err);
+    return;
+  }
+
+  // print the predictions
+  ei_printf("Predictions (DSP: %d ms., Classification: %d ms., Anomaly: %d ms.): \n",
+            result.timing.dsp, result.timing.classification, result.timing.anomaly);
+
+#if EI_CLASSIFIER_OBJECT_DETECTION == 1
+  bool bb_found = result.bounding_boxes[0].value > 0;
+  for (size_t ix = 0; ix < result.bounding_boxes_count; ix++) {
+    auto bb = result.bounding_boxes[ix];
+    if (bb.value == 0) {
+      continue;
+    }
+    ei_printf("    %s (%f) [ x: %u, y: %u, width: %u, height: %u ]\n", bb.label, bb.value, bb.x, bb.y, bb.width, bb.height);
+  
+  }
+  if (!bb_found) {
+    ei_printf("    No objects found\n");
+
+  }
+#else
+  for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
+    ei_printf("    %s: %.5f\n", result.classification[ix].label,
+              result.classification[ix].value);
+  }
+#endif
+
+#if EI_CLASSIFIER_HAS_ANOMALY == 1
+  ei_printf("    anomaly score: %.3f\n", result.anomaly);
+#endif
+
+
+  free(snapshot_buf);
+}
+
+/**
+ * @brief   Setup image sensor & start streaming
+ *
+ * @retval  false if initialisation failed
+ */
+bool ei_camera_init(void) {
+
+  if (is_initialised) return true;
+
+#if defined(CAMERA_MODEL_ESP_EYE)
+  pinMode(13, INPUT_PULLUP);
+  pinMode(14, INPUT_PULLUP);
+#endif
+
+  //initialize the camera
+  esp_err_t err = esp_camera_init(&camera_config);
+  if (err != ESP_OK) {
+    Serial.printf("Camera init failed with error 0x%x\n", err);
+    return false;
+  }
+
+  sensor_t *s = esp_camera_sensor_get();
+  // initial sensors are flipped vertically and colors are a bit saturated
+  if (s->id.PID == OV3660_PID) {
+    s->set_vflip(s, 1);       // flip it back
+    s->set_brightness(s, 1);  // up the brightness just a bit
+    s->set_saturation(s, 0);  // lower the saturation
+  }
+
+
+  is_initialised = true;
+  return true;
+}
+
+/**
+ * @brief      Stop streaming of sensor data
+ */
+void ei_camera_deinit(void) {
+
+  //deinitialize the camera
+  esp_err_t err = esp_camera_deinit();
+
+  if (err != ESP_OK) {
+    ei_printf("Camera deinit failed\n");
+    return;
+  }
+
+  is_initialised = false;
+  return;
+}
+
+
+/**
+ * @brief      Capture, rescale and crop image
+ *
+ * @param[in]  img_width     width of output image
+ * @param[in]  img_height    height of output image
+ * @param[in]  out_buf       pointer to store output image, NULL may be used
+ *                           if ei_camera_frame_buffer is to be used for capture and resize/cropping.
+ *
+ * @retval     false if not initialised, image captured, rescaled or cropped failed
+ *
+ */
+bool ei_camera_capture(uint32_t img_width, uint32_t img_height, uint8_t *out_buf) {
+  bool do_resize = false;
+
+  if (!is_initialised) {
+    ei_printf("ERR: Camera is not initialized\r\n");
+    return false;
+  }
+
+  camera_fb_t *fb = esp_camera_fb_get();
+
+  if (!fb) {
+    ei_printf("Camera capture failed\n");
+    return false;
+  }
+
+  bool converted = fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, snapshot_buf);
+
+  esp_camera_fb_return(fb);
+
+  if (!converted) {
+    ei_printf("Conversion failed\n");
+    return false;
+  }
+
+  if ((img_width != EI_CAMERA_RAW_FRAME_BUFFER_COLS)
+      || (img_height != EI_CAMERA_RAW_FRAME_BUFFER_ROWS)) {
+    do_resize = true;
+  }
+
+  if (do_resize) {
+    ei::image::processing::crop_and_interpolate_rgb888(
+      out_buf,
+      EI_CAMERA_RAW_FRAME_BUFFER_COLS,
+      EI_CAMERA_RAW_FRAME_BUFFER_ROWS,
+      out_buf,
+      img_width,
+      img_height);
+  }
+
 
   return true;
 }
 
-// Function to resize the decoded image to 96x96
-void resize_image(uint16_t *src, uint16_t *dst, int src_width, int src_height, int dst_width, int dst_height) {
-  float x_ratio = (float)src_width / dst_width;
-  float y_ratio = (float)src_height / dst_height;
 
-  for (int y = 0; y < dst_height; y++) {
-    for (int x = 0; x < dst_width; x++) {
-      int src_x = (int)(x * x_ratio);
-      int src_y = (int)(y * y_ratio);
-      dst[y * dst_width + x] = src[src_y * src_width + src_x];
-    }
-  }
-}
-
-
-
-void setup() {
-  Serial.begin(115200);
-
-
-  // Initialize JPEG decoder
-  TJpgDec.setJpgScale(1);          // No scaling
-  TJpgDec.setSwapBytes(true);      // Swap bytes for compatibility
-  TJpgDec.setCallback(jpeg_to_resized_buffer);
-
-  // Camera configuration
-  camera_config_t config;
-  config.ledc_channel = LEDC_CHANNEL_0;
-  config.ledc_timer = LEDC_TIMER_0;
-  config.pin_d0 = Y2_GPIO_NUM;
-  config.pin_d1 = Y3_GPIO_NUM;
-  config.pin_d2 = Y4_GPIO_NUM;
-  config.pin_d3 = Y5_GPIO_NUM;
-  config.pin_d4 = Y6_GPIO_NUM;
-  config.pin_d5 = Y7_GPIO_NUM;
-  config.pin_d6 = Y8_GPIO_NUM;
-  config.pin_d7 = Y9_GPIO_NUM;
-  config.pin_xclk = XCLK_GPIO_NUM;
-  config.pin_pclk = PCLK_GPIO_NUM;
-  config.pin_vsync = VSYNC_GPIO_NUM;
-  config.pin_href = HREF_GPIO_NUM;
-  config.pin_sccb_sda = SIOD_GPIO_NUM;
-  config.pin_sccb_scl = SIOC_GPIO_NUM;
-  config.pin_pwdn = PWDN_GPIO_NUM;
-  config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;
-  config.frame_size = FRAMESIZE_VGA;
-  config.pixel_format = PIXFORMAT_JPEG; // for streaming
-  // config.pixel_format = PIXFORMAT_RGB565; // for face detection/recognition
-  // config.frame_size = FRAMESIZE_96X96;
-  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
-  config.fb_location = CAMERA_FB_IN_PSRAM;
-  config.jpeg_quality = 10;
-  config.fb_count = 1;
-
-  if (esp_camera_init(&config) != ESP_OK) {
-    Serial.println("Camera init failed");
-    return;
-  }
-  Serial.println("Camera initialized");
-}
-
-void loop() {
-   delay(1000);
-  // Capture a frame from the camera
-  camera_fb_t *fb = esp_camera_fb_get();
-  if (!fb) {
-    Serial.println("Camera capture failed");
-    return;
-  }
-
-  // Preprocess the frame data into the input buffer
-  for (int y = 0; y < EI_CLASSIFIER_INPUT_HEIGHT; y++) {
-    for (int x = 0; x < EI_CLASSIFIER_INPUT_WIDTH; x++) {
-      // Extract pixel from RGB565 format
-      uint16_t pixel = ((uint16_t *)fb->buf)[y * EI_CLASSIFIER_INPUT_WIDTH + x];
-      uint8_t r = (pixel >> 11) & 0x1F;
-      uint8_t g = (pixel >> 5) & 0x3F;
-      uint8_t b = pixel & 0x1F;
-
-      // Convert to grayscale and normalize
-      float grayscale = (r * 0.299 + g * 0.587 + b * 0.114) / 31.0;
-      input_buf[y * EI_CLASSIFIER_INPUT_WIDTH + x] = grayscale;
-    }
-  }
-
-  // Release the frame buffer
-  esp_camera_fb_return(fb);
-
-  // Set up the signal object
-  signal_t signal;
-  signal.total_length = EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE;
-  signal.get_data = &get_signal_data;
-
-  // Run the classifier
-  ei_impulse_result_t result;
-  EI_IMPULSE_ERROR res = run_classifier(&signal, &result, false);
-  if (res != EI_IMPULSE_OK) {
-    Serial.printf("Classifier error: %d\n", res);
-    return;
-  }
-
-  // Print the classification results
-  Serial.println("Predictions:");
-  for (size_t i = 0; i < EI_CLASSIFIER_LABEL_COUNT; i++) {
-    Serial.printf("  %s: %.5f\n", ei_classifier_inferencing_categories[i], result.classification[i].value);
-  }
-
-#if EI_CLASSIFIER_HAS_ANOMALY == 1
-  Serial.printf("Anomaly prediction: %.3f\n", result.anomaly);
+#if !defined(EI_CLASSIFIER_SENSOR) || EI_CLASSIFIER_SENSOR != EI_CLASSIFIER_SENSOR_CAMERA
+#error "Invalid model for current sensor"
 #endif
-  Serial.printf("Free heap: %d\n", ESP.getFreeHeap());
-
- 
-}
-
-// Callback: Fill buffer with model input
-static int get_signal_data(size_t offset, size_t length, float *out_ptr) {
-  memcpy(out_ptr, input_buf + offset, length * sizeof(float));
-  return EIDSP_OK;
-}
