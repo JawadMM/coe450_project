@@ -1,7 +1,7 @@
 
-# Edge Impulse library for COE450
+# Edge Impulse library for Hand Gesture
 
-This is a C++ library that lets you run the impulse for "COE450" (https://studio.edgeimpulse.com/studio/569762) on any device. It consists of the Edge Impulse inferencing SDK - with implementations of both processing and learning blocks - and your model. You will need to include this library in your project to run your impulse locally.
+This is a C++ library that lets you run the impulse for "Hand Gesture" (https://studio.edgeimpulse.com/studio/573229) on any device. It consists of the Edge Impulse inferencing SDK - with implementations of both processing and learning blocks - and your model. You will need to include this library in your project to run your impulse locally.
 
 ## Getting Started
 

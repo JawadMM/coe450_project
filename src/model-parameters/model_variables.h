@@ -60,14 +60,14 @@ ei_dsp_config_image_t ei_dsp_config_2 = {
     1, // int length of axes
     ei_dsp_config_2_named_axes, // named axes
     ei_dsp_config_2_named_axes_size, // size of the named axes array
-    "RGB" // select channels
+    "Grayscale" // select channels
 };
 
 const uint8_t ei_dsp_blocks_size = 1;
 ei_model_dsp_t ei_dsp_blocks[ei_dsp_blocks_size] = {
     { // DSP block 2
         2,
-        27648, // output size
+        9216, // output size
         &extract_image_features, // DSP function pointer
         (void*)&ei_dsp_config_2, // pointer to config struct
         ei_dsp_config_2_axes, // array of offsets into the input stream, one for each axis
@@ -122,15 +122,15 @@ const ei_object_detection_nms_config_t ei_object_detection_nms = {
     0.2f  /* NMS IOU threshold */
 };
 
-const ei_impulse_t impulse_569762_0 = {
-    .project_id = 569762,
+const ei_impulse_t impulse_573229_0 = {
+    .project_id = 573229,
     .project_owner = "Jawad Almuttawa",
-    .project_name = "COE450",
+    .project_name = "Hand Gesture",
     .impulse_id = 1,
     .impulse_name = "Impulse #1",
-    .deploy_version = 8,
+    .deploy_version = 1,
 
-    .nn_input_frame_size = 27648,
+    .nn_input_frame_size = 9216,
     .raw_sample_count = 9216,
     .raw_samples_per_frame = 1,
     .dsp_input_frame_size = 9216 * 1,
@@ -169,7 +169,7 @@ const ei_impulse_t impulse_569762_0 = {
     .object_detection_nms = ei_object_detection_nms
 };
 
-ei_impulse_handle_t impulse_handle_569762_0 = ei_impulse_handle_t( &impulse_569762_0 );
-ei_impulse_handle_t& ei_default_impulse = impulse_handle_569762_0;
+ei_impulse_handle_t impulse_handle_573229_0 = ei_impulse_handle_t( &impulse_573229_0 );
+ei_impulse_handle_t& ei_default_impulse = impulse_handle_573229_0;
 
 #endif // _EI_CLASSIFIER_MODEL_VARIABLES_H_
