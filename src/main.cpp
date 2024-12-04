@@ -89,9 +89,7 @@ bool ei_camera_init(void);
 void ei_camera_deinit(void);
 bool ei_camera_capture(uint32_t img_width, uint32_t img_height, uint8_t *out_buf);
 
-/**
-* @brief      Arduino setup function
-*/
+
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
@@ -100,11 +98,6 @@ void setup() {
   I2Cbus.begin(I2C_SDA, I2C_SCL, 100000);
 
 
-
-  //comment out the below line to start inference immediately after upload
-  while (!Serial)
-    ;
-  Serial.println("Edge Impulse Inferencing Demo");
   if (ei_camera_init() == false) {
     ei_printf("Failed to initialize Camera!\r\n");
   } else {
@@ -114,11 +107,7 @@ void setup() {
   ei_printf("\nStarting continious inference in 2 seconds...\n");
 }
 
-/**
-* @brief      Get data and run inferencing
-*
-* @param[in]  debug  Get debug info if true
-*/
+
 void loop() {
   
   // instead of wait_ms, we'll wait on the signal, this allows threads to cancel us...
@@ -186,19 +175,10 @@ void loop() {
   free(snapshot_buf);
 }
 
-/**
- * @brief   Setup image sensor & start streaming
- *
- * @retval  false if initialisation failed
- */
+
 bool ei_camera_init(void) {
 
   if (is_initialised) return true;
-
-#if defined(CAMERA_MODEL_ESP_EYE)
-  pinMode(13, INPUT_PULLUP);
-  pinMode(14, INPUT_PULLUP);
-#endif
 
   //initialize the camera
   esp_err_t err = esp_camera_init(&camera_config);
@@ -209,20 +189,21 @@ bool ei_camera_init(void) {
 
   sensor_t *s = esp_camera_sensor_get();
   // initial sensors are flipped vertically and colors are a bit saturated
-  if (s->id.PID == OV3660_PID) {
-    s->set_vflip(s, 1);       // flip it back
+  // if (s->id.PID == OV3660_PID) {
+  //   s->set_vflip(s, 1);       // flip it back
+  //   s->set_brightness(s, 1);  // up the brightness just a bit
+  //   s->set_saturation(s, 0);  // lower the saturation
+  // }
+
+    s->set_vflip(s, true);       // flip it back
     s->set_brightness(s, 1);  // up the brightness just a bit
     s->set_saturation(s, 0);  // lower the saturation
-  }
-
 
   is_initialised = true;
   return true;
 }
 
-/**
- * @brief      Stop streaming of sensor data
- */
+
 void ei_camera_deinit(void) {
 
   //deinitialize the camera
@@ -237,18 +218,6 @@ void ei_camera_deinit(void) {
   return;
 }
 
-
-/**
- * @brief      Capture, rescale and crop image
- *
- * @param[in]  img_width     width of output image
- * @param[in]  img_height    height of output image
- * @param[in]  out_buf       pointer to store output image, NULL may be used
- *                           if ei_camera_frame_buffer is to be used for capture and resize/cropping.
- *
- * @retval     false if not initialised, image captured, rescaled or cropped failed
- *
- */
 bool ei_camera_capture(uint32_t img_width, uint32_t img_height, uint8_t *out_buf) {
   bool do_resize = false;
 
