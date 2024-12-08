@@ -10,8 +10,8 @@
 #define EI_CAMERA_FRAME_BYTE_SIZE 3
 
 /* I2C Configuration */
-#define I2C_SDA 15
-#define I2C_SCL 14
+// #define I2C_SDA 15
+// #define I2C_SCL 14
 
 /* Camera configuration structure */
 static const camera_config_t camera_config = {
