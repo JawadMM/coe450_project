@@ -90,8 +90,6 @@ TwoWire I2Cbus = TwoWire(0);
 
 void setup() {
     Serial.begin(115200);
-    
-    // I2Cbus.begin(I2C_SDA, I2C_SCL, 100000);
 
     Wire.begin(PCA9685_SDA, PCA9685_SCL);
     delay(100);
@@ -125,7 +123,7 @@ void handleGesture(const ei_impulse_result_t& result) {
     // Check bounding boxes for gestures
     for (size_t ix = 0; ix < result.bounding_boxes_count; ix++) {
         auto bb = result.bounding_boxes[ix];
-        if (bb.value > 0.8 && bb.value > highest_confidence) {  // 70% confidence threshold
+        if (bb.value > 0.6 && bb.value > highest_confidence) {  // 60% confidence threshold
             highest_confidence = bb.value;
             detected_gesture = bb.label;
             gesture_detected = true;
@@ -135,10 +133,10 @@ void handleGesture(const ei_impulse_result_t& result) {
     // Control car based on detected gesture
     if (gesture_detected && detected_gesture != nullptr) {
         if (strcmp(detected_gesture, "forward") == 0) {
-            moveForward(500);  // You can adjust speed as needed
+            moveForward(600);  // You can adjust speed as needed
         }
         else if (strcmp(detected_gesture, "backward") == 0) {
-            moveBackward(500);
+            moveBackward(600);
         }
         else {
             stopMotors();

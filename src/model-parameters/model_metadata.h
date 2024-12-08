@@ -79,10 +79,10 @@
 #define EI_CLASSIFIER_DATATYPE_UINT8             3
 #define EI_CLASSIFIER_DATATYPE_INT8              9
 
-#define EI_CLASSIFIER_PROJECT_ID                 573229
+#define EI_CLASSIFIER_PROJECT_ID                 575775
 #define EI_CLASSIFIER_PROJECT_OWNER              "Jawad Almuttawa"
-#define EI_CLASSIFIER_PROJECT_NAME               "Hand Gesture"
-#define EI_CLASSIFIER_PROJECT_DEPLOY_VERSION     2
+#define EI_CLASSIFIER_PROJECT_NAME               "Hand Gesture Detection for ESP32"
+#define EI_CLASSIFIER_PROJECT_DEPLOY_VERSION     1
 #define EI_CLASSIFIER_NN_INPUT_FRAME_SIZE        27648
 #define EI_CLASSIFIER_RAW_SAMPLE_COUNT           9216
 #define EI_CLASSIFIER_RAW_SAMPLES_PER_FRAME      1
@@ -150,7 +150,7 @@
 
 #define EI_STUDIO_VERSION_MAJOR             1
 #define EI_STUDIO_VERSION_MINOR             61
-#define EI_STUDIO_VERSION_PATCH             34
+#define EI_STUDIO_VERSION_PATCH             36
 
 #define EI_CLASSIFIER_HR_ENABLED            0
 

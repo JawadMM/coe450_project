@@ -9,10 +9,6 @@
 #define EI_CAMERA_RAW_FRAME_BUFFER_ROWS 240
 #define EI_CAMERA_FRAME_BYTE_SIZE 3
 
-/* I2C Configuration */
-// #define I2C_SDA 15
-// #define I2C_SCL 14
-
 /* Camera configuration structure */
 static const camera_config_t camera_config = {
     .pin_pwdn = PWDN_GPIO_NUM,

@@ -42,53 +42,53 @@
 #include <stdint.h>
 #include "model_metadata.h"
 
-#include "tflite-model/tflite_learn_6_compiled.h"
+#include "tflite-model/tflite_learn_3_compiled.h"
 #include "edge-impulse-sdk/classifier/ei_model_types.h"
 #include "edge-impulse-sdk/classifier/inferencing_engines/engines.h"
 
 const char* ei_classifier_inferencing_categories[] = { "backward", "forward" };
 
-ei_dsp_named_axis_t ei_dsp_config_5_named_axes[] = {
+ei_dsp_named_axis_t ei_dsp_config_2_named_axes[] = {
     { .name = "Image", .axis = 0 }
 };
-size_t ei_dsp_config_5_named_axes_size = 1;
-uint8_t ei_dsp_config_5_axes[] = { 0 };
-const uint32_t ei_dsp_config_5_axes_size = 1;
-ei_dsp_config_image_t ei_dsp_config_5 = {
-    5, // uint32_t blockId
+size_t ei_dsp_config_2_named_axes_size = 1;
+uint8_t ei_dsp_config_2_axes[] = { 0 };
+const uint32_t ei_dsp_config_2_axes_size = 1;
+ei_dsp_config_image_t ei_dsp_config_2 = {
+    2, // uint32_t blockId
     1, // int implementationVersion
     1, // int length of axes
-    ei_dsp_config_5_named_axes, // named axes
-    ei_dsp_config_5_named_axes_size, // size of the named axes array
+    ei_dsp_config_2_named_axes, // named axes
+    ei_dsp_config_2_named_axes_size, // size of the named axes array
     "RGB" // select channels
 };
 
 const uint8_t ei_dsp_blocks_size = 1;
 ei_model_dsp_t ei_dsp_blocks[ei_dsp_blocks_size] = {
-    { // DSP block 5
-        5,
+    { // DSP block 2
+        2,
         27648, // output size
         &extract_image_features, // DSP function pointer
-        (void*)&ei_dsp_config_5, // pointer to config struct
-        ei_dsp_config_5_axes, // array of offsets into the input stream, one for each axis
-        ei_dsp_config_5_axes_size, // number of axes
+        (void*)&ei_dsp_config_2, // pointer to config struct
+        ei_dsp_config_2_axes, // array of offsets into the input stream, one for each axis
+        ei_dsp_config_2_axes_size, // number of axes
         1, // version
         nullptr, // factory function
     }
 };
-const ei_config_tflite_eon_graph_t ei_config_tflite_graph_6 = {
+const ei_config_tflite_eon_graph_t ei_config_tflite_graph_3 = {
     .implementation_version = 1,
-    .model_init = &tflite_learn_6_init,
-    .model_invoke = &tflite_learn_6_invoke,
-    .model_reset = &tflite_learn_6_reset,
-    .model_input = &tflite_learn_6_input,
-    .model_output = &tflite_learn_6_output,
+    .model_init = &tflite_learn_3_init,
+    .model_invoke = &tflite_learn_3_invoke,
+    .model_reset = &tflite_learn_3_reset,
+    .model_input = &tflite_learn_3_input,
+    .model_output = &tflite_learn_3_output,
 };
 
-const ei_learning_block_config_tflite_graph_t ei_learning_block_config_6 = {
+const ei_learning_block_config_tflite_graph_t ei_learning_block_config_3 = {
     .implementation_version = 1,
     .classification_mode = EI_CLASSIFIER_CLASSIFICATION_MODE_OBJECT_DETECTION,
-    .block_id = 6,
+    .block_id = 3,
     .object_detection = 1,
     .object_detection_last_layer = EI_CLASSIFIER_LAST_LAYER_FOMO,
     .output_data_tensor = 0,
@@ -97,21 +97,21 @@ const ei_learning_block_config_tflite_graph_t ei_learning_block_config_6 = {
     .threshold = 0.5,
     .quantized = 1,
     .compiled = 1,
-    .graph_config = (void*)&ei_config_tflite_graph_6
+    .graph_config = (void*)&ei_config_tflite_graph_3
 };
 
 const uint8_t ei_learning_blocks_size = 1;
-const uint32_t ei_learning_block_6_inputs[1] = { 5 };
-const uint8_t ei_learning_block_6_inputs_size = 1;
+const uint32_t ei_learning_block_3_inputs[1] = { 2 };
+const uint8_t ei_learning_block_3_inputs_size = 1;
 const ei_learning_block_t ei_learning_blocks[ei_learning_blocks_size] = {
     {
-        6,
+        3,
         false,
         &run_nn_inference,
-        (void*)&ei_learning_block_config_6,
+        (void*)&ei_learning_block_config_3,
         EI_CLASSIFIER_IMAGE_SCALING_NONE,
-        ei_learning_block_6_inputs,
-        ei_learning_block_6_inputs_size,
+        ei_learning_block_3_inputs,
+        ei_learning_block_3_inputs_size,
         432
     },
 };
@@ -122,13 +122,13 @@ const ei_object_detection_nms_config_t ei_object_detection_nms = {
     0.2f  /* NMS IOU threshold */
 };
 
-const ei_impulse_t impulse_573229_0 = {
-    .project_id = 573229,
+const ei_impulse_t impulse_575775_0 = {
+    .project_id = 575775,
     .project_owner = "Jawad Almuttawa",
-    .project_name = "Hand Gesture",
-    .impulse_id = 2,
-    .impulse_name = "Impulse #2",
-    .deploy_version = 2,
+    .project_name = "Hand Gesture Detection for ESP32",
+    .impulse_id = 1,
+    .impulse_name = "Impulse #1",
+    .deploy_version = 1,
 
     .nn_input_frame_size = 27648,
     .raw_sample_count = 9216,
@@ -169,7 +169,7 @@ const ei_impulse_t impulse_573229_0 = {
     .object_detection_nms = ei_object_detection_nms
 };
 
-ei_impulse_handle_t impulse_handle_573229_0 = ei_impulse_handle_t( &impulse_573229_0 );
-ei_impulse_handle_t& ei_default_impulse = impulse_handle_573229_0;
+ei_impulse_handle_t impulse_handle_575775_0 = ei_impulse_handle_t( &impulse_575775_0 );
+ei_impulse_handle_t& ei_default_impulse = impulse_handle_575775_0;
 
 #endif // _EI_CLASSIFIER_MODEL_VARIABLES_H_
