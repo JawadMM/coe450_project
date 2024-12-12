@@ -1,7 +1,7 @@
 #include "./camera/ei_camera.h"
 #include "./camera/camera_config.h"
 #include "edge-impulse-sdk/classifier/ei_run_classifier.h"
-#include "./motor/motor_control.h"  // Path to our new motor control module
+#include "./motor/motor_control.h" 
 #include <Arduino.h>
 #include <Wire.h>
 
@@ -123,7 +123,8 @@ void handleGesture(const ei_impulse_result_t& result) {
     // Check bounding boxes for gestures
     for (size_t ix = 0; ix < result.bounding_boxes_count; ix++) {
         auto bb = result.bounding_boxes[ix];
-        if (bb.value > 0.6 && bb.value > highest_confidence) {  // 60% confidence threshold
+        // if (bb.value > 0.4 && bb.value > highest_confidence) {  // 40% confidence threshold
+        if (bb.value > highest_confidence) {
             highest_confidence = bb.value;
             detected_gesture = bb.label;
             gesture_detected = true;
@@ -133,7 +134,7 @@ void handleGesture(const ei_impulse_result_t& result) {
     // Control car based on detected gesture
     if (gesture_detected && detected_gesture != nullptr) {
         if (strcmp(detected_gesture, "forward") == 0) {
-            moveForward(600);  // You can adjust speed as needed
+            moveForward(600); 
         }
         else if (strcmp(detected_gesture, "backward") == 0) {
             moveBackward(600);
@@ -148,9 +149,9 @@ void handleGesture(const ei_impulse_result_t& result) {
 }
 
 void loop() {
-  if (ei_sleep(5) != EI_IMPULSE_OK) {
-        return;
-    }
+//   if (ei_sleep(5) != EI_IMPULSE_OK) {
+//         return;
+//     }
 
     // Allocate memory for camera frame
     snapshot_buf = (uint8_t *)malloc(EI_CAMERA_RAW_FRAME_BUFFER_COLS * 
